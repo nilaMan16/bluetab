@@ -1,6 +1,6 @@
 # BlueTab
 
-BlueTab is a Ghibli-inspired trip planning web app built for low-network use. It stores data locally in IndexedDB, syncs to Supabase when online, supports phone-number OTP authentication, and lets travelers share trips through invite codes and QR codes.
+BlueTab is a Ghibli-inspired trip planning web app built for low-network use. It stores data locally in IndexedDB, syncs to Supabase when online, supports email and password authentication, and lets travelers share trips through invite codes and QR codes.
 
 ## Features
 
@@ -47,7 +47,7 @@ BlueTab is a Ghibli-inspired trip planning web app built for low-network use. It
 
 1. Create a new Supabase project.
 2. In the SQL editor, run [`supabase/schema.sql`](./supabase/schema.sql).
-3. In Authentication, enable Phone auth and configure an SMS provider for OTP delivery.
+3. In Authentication, enable Email auth.
 4. Copy the project URL and anon key into `.env`.
 
 The schema uses Row Level Security so authenticated members of a trip can read and update it.

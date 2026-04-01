@@ -914,8 +914,7 @@ label {
 
 .auth-showcase,
 .auth-panel,
-.auth-showcase-copy,
-.auth-feature-list {
+.auth-showcase-copy {
   display: grid;
   gap: 0.9rem;
 }
@@ -934,30 +933,9 @@ label {
 }
 
 .auth-showcase-copy h2 {
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 1.05;
-}
-
-.auth-feature-list {
-  margin-top: 0.3rem;
-}
-
-.auth-feature-item {
-  padding: 0.9rem 1rem;
-  border-radius: 18px;
-  background: rgba(255, 251, 244, 0.62);
-  border: 1px solid rgba(118, 101, 72, 0.09);
-  display: grid;
-  gap: 0.25rem;
-}
-
-.auth-feature-item strong {
-  font-size: 1.02rem;
-}
-
-.auth-feature-item span {
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-  color: var(--ink-soft);
+  font-size: clamp(2.2rem, 3vw, 3.1rem);
+  line-height: 0.95;
+  margin: 0;
 }
 
 .auth-panel {
@@ -1216,7 +1194,7 @@ label {
   }
 
   .auth-showcase-copy h2 {
-    font-size: 1.7rem;
+    font-size: 1.9rem;
   }
 
   .header-actions {
