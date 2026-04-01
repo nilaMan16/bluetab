@@ -86,7 +86,7 @@ export const fetchCloudTrips = async (session: Session | null) => {
 
 export const joinTripByInviteCode = async (inviteCode: string, session: Session | null) => {
   if (!hasSupabaseEnv || !supabase || !session?.user) {
-    throw new Error("Supabase is not configured.");
+    throw new Error("Cloud sync is not configured.");
   }
 
   const { data, error } = await supabase
@@ -96,7 +96,7 @@ export const joinTripByInviteCode = async (inviteCode: string, session: Session 
     .single();
 
   if (error || !data) {
-    throw error || new Error("No trip found for that code.");
+    throw new Error("No online group was found for that Group ID. Ask the creator to sign in and sync the trip first.");
   }
 
   const row = data as SupabaseTripRow;
@@ -123,7 +123,7 @@ export const joinTripByInviteCode = async (inviteCode: string, session: Session 
     .single();
 
   if (updateError || !updatedRow) {
-    throw updateError || new Error("Unable to join the trip.");
+    throw new Error("This group exists, but joining failed. Ask the creator to open the trip and sync again.");
   }
 
   const trip = mapRowToTrip(updatedRow as SupabaseTripRow);

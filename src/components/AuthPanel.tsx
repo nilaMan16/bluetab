@@ -85,11 +85,7 @@ export function AuthPanel({ onContinueOffline }: AuthPanelProps) {
           {mode === "signup" ? (
             <label>
               Full name
-              <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your name"
-              />
+              <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </label>
           ) : null}
 
@@ -99,7 +95,6 @@ export function AuthPanel({ onContinueOffline }: AuthPanelProps) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
               required
             />
           </label>
@@ -110,7 +105,6 @@ export function AuthPanel({ onContinueOffline }: AuthPanelProps) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
               minLength={6}
               required
             />

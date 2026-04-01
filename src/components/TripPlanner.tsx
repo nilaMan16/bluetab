@@ -513,7 +513,6 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 <input
                   value={activeTrip.destination}
                   onChange={(e) => void updateTrip((trip) => ({ ...trip, destination: e.target.value }))}
-                  placeholder="Where are you going?"
                 />
               </label>
               <label>
@@ -527,7 +526,6 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
             <textarea
               value={activeTrip.tagline}
               onChange={(e) => void updateTrip((trip) => ({ ...trip, tagline: e.target.value }))}
-              placeholder="Add a short note..."
             />
           </article>
 
@@ -577,7 +575,6 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
               <input
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="Enter group ID"
               />
               <button className="ghost-button compact-button" type="button" onClick={handleJoinTrip} disabled={!session}>
                 Join group
@@ -672,7 +669,6 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         )
                       }))
                     }
-                    placeholder="Cost in INR"
                   />
                 </div>
                 <textarea
@@ -785,7 +781,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                       )
                     }))
                   }
-                    placeholder="Address"
+                  placeholder="Add address"
                 />
                 <div className="three-column">
                   <input
@@ -810,7 +806,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         )
                       }))
                     }
-                      placeholder="Estimate"
+                    placeholder="Add estimate"
                   />
                   <input
                     value={place.mapUrl}
@@ -822,7 +818,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         )
                       }))
                     }
-                      placeholder="Map URL"
+                    placeholder="Add map URL"
                   />
                 </div>
                 {place.mapUrl ? (
@@ -997,7 +993,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                           )
                         }))
                       }
-                      placeholder="Amount in INR"
+                      placeholder="Add amount"
                     />
                     <select
                       value={expense.paidBy}
@@ -1174,7 +1170,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
             <textarea
               value={activeTrip.notes}
               onChange={(e) => void updateTrip((trip) => ({ ...trip, notes: e.target.value }))}
-              placeholder="Packing ideas, visa notes, station reminders, hotel check-in details..."
+              placeholder="Add notes"
             />
           </article>
         </section>
