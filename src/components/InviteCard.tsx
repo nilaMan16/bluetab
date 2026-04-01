@@ -12,7 +12,7 @@ export function InviteCard({ inviteCode, tripTitle }: InviteCardProps) {
   useEffect(() => {
     let active = true;
 
-    QRCode.toDataURL(`Trip invite: ${tripTitle} | Code: ${inviteCode}`, {
+    QRCode.toDataURL(`BlueTab Group ID: ${inviteCode} | Trip: ${tripTitle}`, {
       width: 180,
       margin: 1,
       color: {
@@ -33,16 +33,16 @@ export function InviteCard({ inviteCode, tripTitle }: InviteCardProps) {
   return (
     <div className="card invite-card">
       <div>
-        <p className="eyebrow">Travel group invite</p>
-        <h3>Share by code or QR</h3>
+        <p className="eyebrow">Travel group</p>
+        <h3>Share group ID</h3>
         <p className="muted">
-          Send this to a friend so they can join the trip after signing in.
+          Share this group ID or QR so your friends can join the trip after signing in.
         </p>
       </div>
       <div className="invite-layout">
         <div>
           <div className="invite-code">{inviteCode}</div>
-          <p className="helper">Use this code inside the join panel.</p>
+          <p className="helper">Friends can use this in the join group section.</p>
         </div>
         {dataUrl ? <img src={dataUrl} alt={`QR code for ${tripTitle}`} className="qr-code" /> : null}
       </div>

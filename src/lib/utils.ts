@@ -37,22 +37,18 @@ export const expensePerPerson = (trip: TripRecord) => {
 
 export const buildBlankTrip = (input?: Partial<TripDraftInput>): TripRecord => ({
   id: uid(),
-  title: input?.title || "Whispering Valley Escape",
-  destination: input?.destination || "Kyoto",
-  tagline: input?.tagline || "Tea houses, train windows, and soft evening skies.",
+  title: input?.title || "New Trip",
+  destination: input?.destination || "",
+  tagline: input?.tagline || "",
   startDate: input?.startDate || "",
   endDate: input?.endDate || "",
   currency: input?.currency || "INR",
   inviteCode: createInviteCode(),
-  coverMood: input?.coverMood || "Sunlit countryside",
+  coverMood: input?.coverMood || "",
   itinerary: [],
   places: [],
   expenses: [],
-  checklist: [
-    { id: uid(), label: "Book stay", done: false },
-    { id: uid(), label: "Buy train passes", done: false },
-    { id: uid(), label: "Save offline maps", done: false }
-  ],
+  checklist: [],
   notes: "",
   members: [{ id: uid(), name: "You" }],
   updatedAt: new Date().toISOString()

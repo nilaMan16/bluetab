@@ -192,12 +192,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
         setTrips(localTrips);
         setActiveTripId(localTrips[0].id);
       } else {
-        const starter = buildBlankTrip({
-          title: "Rajasthan Desert Journey",
-          destination: "Rajasthan",
-          tagline: "Forts, chai stops, desert skies, and slow golden evenings.",
-          coverMood: "Amber dunes"
-        });
+        const starter = buildBlankTrip();
         await saveLocalTrip(starter);
         setTrips([starter]);
         setActiveTripId(starter.id);
@@ -256,10 +251,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
 
   const createTrip = async () => {
     const freshTrip = buildBlankTrip({
-      title: `Journey ${trips.length + 1}`,
-      destination: "Somewhere magical",
-      tagline: "A calm new route waiting to be planned.",
-      coverMood: "Soft morning light"
+      title: `Trip ${trips.length + 1}`
     });
     await saveLocalTrip(freshTrip);
     setTrips((current) => [freshTrip, ...current]);
@@ -511,8 +503,8 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
           <article className="card spotlight-stack">
             <div className="section-head">
               <div>
-                <p className="eyebrow">Quick details</p>
-                <h3>Trip overview</h3>
+                <p className="eyebrow">Trip details</p>
+                <h3>Overview</h3>
               </div>
             </div>
             <div className="compact-form">
@@ -521,20 +513,21 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 <input
                   value={activeTrip.destination}
                   onChange={(e) => void updateTrip((trip) => ({ ...trip, destination: e.target.value }))}
+                  placeholder="Where are you going?"
                 />
               </label>
               <label>
-                Mood
+                Group ID
                 <input
-                  value={activeTrip.coverMood}
-                  onChange={(e) => void updateTrip((trip) => ({ ...trip, coverMood: e.target.value }))}
+                  value={activeTrip.inviteCode}
+                  readOnly
                 />
               </label>
             </div>
             <textarea
               value={activeTrip.tagline}
               onChange={(e) => void updateTrip((trip) => ({ ...trip, tagline: e.target.value }))}
-              placeholder="Trip vibe, route idea, or a short summary..."
+              placeholder="Add a short note..."
             />
           </article>
 
@@ -578,16 +571,16 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
           </article>
 
           <article className="card">
-            <p className="eyebrow">Join a friend</p>
-            <h3>Invite code</h3>
+            <p className="eyebrow">Join group</p>
+            <h3>Group ID</h3>
             <div className="stacked-row">
               <input
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="ABC123"
+                placeholder="Enter group ID"
               />
               <button className="ghost-button compact-button" type="button" onClick={handleJoinTrip} disabled={!session}>
-                Join
+                Join group
               </button>
             </div>
             <p className="helper">{session ? status : "Sign in first to join shared trips."}</p>
@@ -611,12 +604,12 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                   ...trip,
                   itinerary: [
                     ...trip.itinerary,
-                    {
-                      id: uid(),
-                      title: "New stop",
-                      day: trip.startDate,
-                      time: "09:00",
-                      notes: "",
+                      {
+                        id: uid(),
+                        title: "",
+                        day: trip.startDate,
+                        time: "09:00",
+                        notes: "",
                       cost: 0
                     }
                   ]
@@ -692,7 +685,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                       )
                     }))
                   }
-                  placeholder="Notes, booking reference, train details..."
+                  placeholder="Add notes"
                 />
               </div>
             ))}
@@ -746,11 +739,11 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                     ...trip.places,
                     {
                       id: uid(),
-                      name: "New place",
+                      name: "",
                       address: "",
                       mapUrl: "",
                       estimate: 0,
-                      category: "Food"
+                      category: ""
                     }
                   ]
                 }))
@@ -792,7 +785,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                       )
                     }))
                   }
-                  placeholder="Address or search term"
+                    placeholder="Address"
                 />
                 <div className="three-column">
                   <input
@@ -817,7 +810,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         )
                       }))
                     }
-                    placeholder="Estimate in INR"
+                      placeholder="Estimate"
                   />
                   <input
                     value={place.mapUrl}
@@ -829,7 +822,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         )
                       }))
                     }
-                    placeholder="Map link"
+                      placeholder="Map URL"
                   />
                 </div>
                 {place.mapUrl ? (
@@ -935,7 +928,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                       ...trip.expenses,
                       {
                         id: uid(),
-                        title: "Shared meal",
+                        title: "",
                         amount: 0,
                         category: defaultExpenseCategory,
                         date: new Date().toISOString().slice(0, 10),
@@ -1107,7 +1100,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                   </div>
                 </div>
               ))}
-              {!activeTrip.expenses.length ? <p className="helper">Add shared payments, pick who paid, and tap members to split the cost.</p> : null}
+              {!activeTrip.expenses.length ? <p className="helper">Add shared expenses for this group.</p> : null}
             </div>
           </article>
 
@@ -1136,7 +1129,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 onClick={() =>
                   void updateTrip((trip) => ({
                     ...trip,
-                    checklist: [...trip.checklist, { id: uid(), label: "New reminder", done: false }]
+                    checklist: [...trip.checklist, { id: uid(), label: "", done: false }]
                   }))
                 }
               >
