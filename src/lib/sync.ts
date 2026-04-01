@@ -91,44 +91,33 @@ export const joinTripByInviteCode = async (inviteCode: string, session: Session 
     throw new Error("Cloud sync is not configured.");
   }
 
-  const { data, error } = await supabase
-    .from("trips")
-    .select("*")
-    .eq("invite_code", inviteCode.trim().toUpperCase())
-    .single();
+  const memberName =
+    session.user.user_metadata?.full_name?.trim() ||
+    session.user.email?.split("@")[0]?.trim() ||
+    "Travel friend";
+
+  const { data, error } = await supabase.rpc("join_trip_by_invite_code", {
+    p_invite_code: inviteCode.trim().toUpperCase(),
+    p_member_id: session.user.id,
+    p_member_name: memberName,
+    p_member_email: session.user.email || null
+  });
 
   if (error || !data) {
-    throw new Error("No online group was found for that Group ID. Ask the creator to sign in and sync the trip first.");
+    const message = error?.message || "";
+
+    if (message.includes("TRIP_NOT_FOUND")) {
+      throw new Error("No group was found for that Group ID.");
+    }
+
+    if (message.includes("join_trip_by_invite_code")) {
+      throw new Error("Join-by-code is not enabled on the backend yet. Run the latest schema.sql in Supabase and try again.");
+    }
+
+    throw new Error("This group exists, but joining failed. Please try again in a moment.");
   }
 
-  const row = data as SupabaseTripRow;
-  const existingMember = row.members.find((member) => member.id === session.user.id);
-  const nextMembers = existingMember
-    ? row.members
-    : [
-        ...row.members,
-        {
-          id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.email || "Travel friend",
-          email: session.user.email
-        }
-      ];
-
-  const { data: updatedRow, error: updateError } = await supabase
-    .from("trips")
-    .update({
-      members: nextMembers,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", row.id)
-    .select()
-    .single();
-
-  if (updateError || !updatedRow) {
-    throw new Error("This group exists, but joining failed. Ask the creator to open the trip and sync again.");
-  }
-
-  const trip = mapRowToTrip(updatedRow as SupabaseTripRow);
+  const trip = mapRowToTrip(data as SupabaseTripRow);
   await saveLocalTrip(trip);
   return trip;
 };
