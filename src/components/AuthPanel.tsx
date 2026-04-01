@@ -5,9 +5,10 @@ type AuthMode = "signin" | "signup";
 
 type AuthPanelProps = {
   onContinueOffline: () => void;
+  onSignedUp: () => void;
 };
 
-export function AuthPanel({ onContinueOffline }: AuthPanelProps) {
+export function AuthPanel({ onContinueOffline, onSignedUp }: AuthPanelProps) {
   const [mode, setMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +48,8 @@ export function AuthPanel({ onContinueOffline }: AuthPanelProps) {
           throw error;
         }
 
-        setMessage("Account created. Check your email if confirmation is required, then sign in.");
+        onSignedUp();
+        setMessage("Account created. Sign in to create your first trip if you are not redirected automatically.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),

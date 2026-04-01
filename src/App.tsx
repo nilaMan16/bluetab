@@ -8,6 +8,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [offlineOnly, setOfflineOnly] = useState(false);
   const [loading, setLoading] = useState(Boolean(supabase));
+  const [preferredEntryMode, setPreferredEntryMode] = useState<"choose" | "create">("choose");
 
   useEffect(() => {
     if (!supabase) {
@@ -24,6 +25,9 @@ export default function App() {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_, nextSession) => {
       setSession(nextSession);
+      if (!nextSession) {
+        setPreferredEntryMode("choose");
+      }
       setLoading(false);
     });
 
@@ -52,9 +56,16 @@ export default function App() {
             <p className="muted">Checking your BlueTab space...</p>
           </section>
         ) : session || offlineOnly || !supabase ? (
-          <TripPlanner session={session} offlineOnly={offlineOnly || !supabase} />
+          <TripPlanner
+            session={session}
+            offlineOnly={offlineOnly || !supabase}
+            preferredEntryMode={preferredEntryMode}
+          />
         ) : (
-          <AuthPanel onContinueOffline={() => setOfflineOnly(true)} />
+          <AuthPanel
+            onContinueOffline={() => setOfflineOnly(true)}
+            onSignedUp={() => setPreferredEntryMode("create")}
+          />
         )}
       </div>
     </div>

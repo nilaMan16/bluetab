@@ -37,7 +37,7 @@ export const expensePerPerson = (trip: TripRecord) => {
 
 export const buildBlankTrip = (input?: Partial<TripDraftInput>): TripRecord => ({
   id: uid(),
-  title: input?.title || "New Trip",
+  title: input?.title || "",
   destination: input?.destination || "",
   tagline: input?.tagline || "",
   startDate: input?.startDate || "",
@@ -50,7 +50,7 @@ export const buildBlankTrip = (input?: Partial<TripDraftInput>): TripRecord => (
   expenses: [],
   checklist: [],
   notes: "",
-  members: [{ id: uid(), name: "You" }],
+  members: [],
   updatedAt: new Date().toISOString()
 });
 

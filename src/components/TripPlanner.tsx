@@ -19,6 +19,7 @@ import { InviteCard } from "./InviteCard";
 type TripPlannerProps = {
   session: Session | null;
   offlineOnly: boolean;
+  preferredEntryMode?: "choose" | "create";
 };
 
 type PlannerTab = "overview" | "itinerary" | "places" | "budget" | "split" | "packing";
@@ -44,7 +45,7 @@ const categoryMetaByName = new Map<string, (typeof expenseCategories)[number]>(
 
 const buildBalanceMap = (trip: TripRecord) => {
   const memberNames = trip.members.map((member) => member.name.trim()).filter(Boolean);
-  const uniqueMembers = Array.from(new Set(memberNames.length ? memberNames : ["You"]));
+  const uniqueMembers = Array.from(new Set(memberNames.length ? memberNames : ["Traveler"]));
   const balances = new Map<string, number>(uniqueMembers.map((name) => [name, 0]));
 
   trip.expenses.forEach((expense) => {
@@ -150,7 +151,7 @@ function LanternBird() {
   );
 }
 
-export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
+export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose" }: TripPlannerProps) {
   const [trips, setTrips] = useState<TripRecord[]>([]);
   const [activeTripId, setActiveTripId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<PlannerTab>("overview");
@@ -218,6 +219,12 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
     void load();
   }, [offlineOnly, session]);
 
+  useEffect(() => {
+    if (!trips.length) {
+      setEntryMode(preferredEntryMode);
+    }
+  }, [preferredEntryMode, trips.length]);
+
   const activeTrip = useMemo(
     () => trips.find((trip) => trip.id === activeTripId) ?? trips[0] ?? null,
     [activeTripId, trips]
@@ -260,7 +267,15 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
       return;
     }
 
-    const freshTrip = buildBlankTrip();
+    const creatorName =
+      session.user.user_metadata?.full_name?.trim() ||
+      session.user.email?.split("@")[0]?.trim() ||
+      "Creator";
+
+    const freshTrip = {
+      ...buildBlankTrip(),
+      members: [{ id: session.user.id, name: creatorName }]
+    };
     setStatus("Creating trip and syncing Group ID...");
 
     let nextTrip = freshTrip;
@@ -328,7 +343,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
           <div className="onboarding-copy">
             <p className="eyebrow">Start here</p>
             <h2>Create or join</h2>
-            <p className="muted">Start a fresh trip or enter a Group ID to join friends.</p>
+            <p className="muted">Create your first trip or enter a Group ID to join friends.</p>
           </div>
 
           <div className="onboarding-actions">
@@ -1012,7 +1027,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         amount: 0,
                         category: defaultExpenseCategory,
                         date: new Date().toISOString().slice(0, 10),
-                        paidBy: trip.members[0]?.name || "You",
+                        paidBy: trip.members[0]?.name || "",
                         splitBetween: trip.members.map((member) => member.name)
                       }
                     ]
