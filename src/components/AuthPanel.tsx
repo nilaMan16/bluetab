@@ -83,94 +83,123 @@ export function AuthPanel({ onContinueOffline }: AuthPanelProps) {
   };
 
   return (
-    <section className="card auth-card">
-      <div>
-        <p className="eyebrow">Offline-friendly travel planning</p>
-        <h2>{heading}</h2>
-        <p className="muted">
-          Use your phone number to sign up or sign in with a one-time password. Trips still work
-          offline, and cloud sync turns on once Supabase is connected.
-        </p>
+    <section className="card auth-card auth-layout">
+      <aside className="auth-showcase">
+        <img src="/bluetab-logo.png" alt="BlueTab logo" className="auth-logo" />
+        <div className="auth-showcase-copy">
+          <p className="eyebrow">BlueTab Journey Planner</p>
+          <h2>Plan once, travel calmly.</h2>
+          <p className="muted">
+            Save itineraries, places, shared budgets, and group plans that stay usable even in low
+            network areas.
+          </p>
+        </div>
+        <div className="auth-feature-list">
+          <div className="auth-feature-item">
+            <strong>Offline-first</strong>
+            <span>Trips remain available on weak or unstable connections.</span>
+          </div>
+          <div className="auth-feature-item">
+            <strong>Phone OTP</strong>
+            <span>Quick sign in for mobile-first travelers and shared groups.</span>
+          </div>
+          <div className="auth-feature-item">
+            <strong>Group ready</strong>
+            <span>Invite friends, split costs, and sync the journey to the cloud.</span>
+          </div>
+        </div>
+      </aside>
+
+      <div className="auth-panel">
+        <div>
+          <p className="eyebrow">{otpSent ? "Step 2 of 2" : "Step 1 of 2"}</p>
+          <h2>{heading}</h2>
+          <p className="muted">
+            {otpSent
+              ? "We sent a one-time password to your phone. Enter it below to continue into BlueTab."
+              : "Use your mobile number to sign up or sign in. The same flow works for both."}
+          </p>
+        </div>
+
+        {!otpSent ? (
+          <form className="auth-form" onSubmit={requestOtp}>
+            <label>
+              Full name
+              <input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Your name"
+              />
+            </label>
+
+            <label>
+              Phone number
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                required
+              />
+            </label>
+
+            <button className="primary-button" type="submit" disabled={busy || !hasSupabaseEnv}>
+              {busy ? "Sending OTP..." : "Send OTP"}
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={verifyOtp}>
+            <label>
+              Phone number
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+            </label>
+
+            <label>
+              OTP code
+              <input
+                inputMode="numeric"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="6-digit code"
+                required
+              />
+            </label>
+
+            <button className="primary-button" type="submit" disabled={busy || !hasSupabaseEnv}>
+              {busy ? "Verifying..." : "Verify OTP"}
+            </button>
+          </form>
+        )}
+
+        {message ? <p className="notice">{message}</p> : null}
+
+        <div className="auth-actions">
+          {otpSent ? (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                setOtp("");
+                setOtpSent(false);
+                setMessage(null);
+              }}
+            >
+              Change number
+            </button>
+          ) : null}
+          <button type="button" className="ghost-button" onClick={onContinueOffline}>
+            Continue offline
+          </button>
+        </div>
+
+        {!hasSupabaseEnv ? (
+          <p className="helper">
+            Cloud sync is waiting for `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+          </p>
+        ) : (
+          <p className="helper">Use full international format, for example `+91` followed by your number.</p>
+        )}
       </div>
-
-      {!otpSent ? (
-        <form className="auth-form" onSubmit={requestOtp}>
-          <label>
-            Full name
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Your name"
-            />
-          </label>
-
-          <label>
-            Phone number
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+91 98765 43210"
-              required
-            />
-          </label>
-
-          <button className="primary-button" type="submit" disabled={busy || !hasSupabaseEnv}>
-            {busy ? "Sending OTP..." : "Send OTP"}
-          </button>
-        </form>
-      ) : (
-        <form className="auth-form" onSubmit={verifyOtp}>
-          <label>
-            Phone number
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          </label>
-
-          <label>
-            OTP code
-            <input
-              inputMode="numeric"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="6-digit code"
-              required
-            />
-          </label>
-
-          <button className="primary-button" type="submit" disabled={busy || !hasSupabaseEnv}>
-            {busy ? "Verifying..." : "Verify OTP"}
-          </button>
-        </form>
-      )}
-
-      {message ? <p className="notice">{message}</p> : null}
-
-      <div className="auth-actions">
-        {otpSent ? (
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => {
-              setOtp("");
-              setOtpSent(false);
-              setMessage(null);
-            }}
-          >
-            Change number
-          </button>
-        ) : null}
-        <button type="button" className="ghost-button" onClick={onContinueOffline}>
-          Continue offline
-        </button>
-      </div>
-
-      {!hasSupabaseEnv ? (
-        <p className="helper">
-          Cloud sync is waiting for `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-        </p>
-      ) : (
-        <p className="helper">Use full international format, for example `+91` followed by your number.</p>
-      )}
     </section>
   );
 }

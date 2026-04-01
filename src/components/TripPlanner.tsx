@@ -357,7 +357,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
     <div className="planner-v2">
       <section className="planner-header card">
         <div className="brand-lockup">
-          <div className="brand-mark">🌿</div>
+          <img src="/bluetab-logo.png" alt="BlueTab logo" className="brand-logo-image" />
           <div>
             <h2>BlueTab</h2>
             <p className="eyebrow">Journey Planner</p>
