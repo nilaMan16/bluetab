@@ -1,4 +1,4 @@
-import type { TripDraftInput, TripRecord } from "./types";
+import type { ItineraryItem, TripDraftInput, TripRecord } from "./types";
 
 export const expenseCategories = [
   { label: "Accommodation", icon: "🏨", color: "#c99b67" },
@@ -52,6 +52,22 @@ export const buildBlankTrip = (input?: Partial<TripDraftInput>): TripRecord => (
   notes: "",
   members: [{ id: uid(), name: "You" }],
   updatedAt: new Date().toISOString()
+});
+
+const normalizeItineraryItem = (item: Partial<ItineraryItem>): ItineraryItem => ({
+  id: item.id || uid(),
+  title: item.title || "",
+  day: item.day || "",
+  time: item.time || "",
+  location: item.location || "",
+  mapUrl: item.mapUrl || "",
+  notes: item.notes || "",
+  cost: item.cost || 0
+});
+
+export const normalizeTrip = (trip: TripRecord): TripRecord => ({
+  ...trip,
+  itinerary: (trip.itinerary || []).map((item) => normalizeItineraryItem(item as Partial<ItineraryItem>))
 });
 
 export const toMapSearchUrl = (query: string) =>

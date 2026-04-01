@@ -2,6 +2,7 @@ import type { Session } from "@supabase/supabase-js";
 import { saveLocalTrip } from "./local-db";
 import { hasSupabaseEnv, supabase } from "./supabase";
 import type { SupabaseTripRow, TripRecord } from "./types";
+import { normalizeTrip } from "./utils";
 
 const mapTripToRow = (trip: TripRecord, ownerId: string): SupabaseTripRow => ({
   id: trip.id,
@@ -23,7 +24,8 @@ const mapTripToRow = (trip: TripRecord, ownerId: string): SupabaseTripRow => ({
   updated_at: new Date().toISOString()
 });
 
-const mapRowToTrip = (row: SupabaseTripRow): TripRecord => ({
+const mapRowToTrip = (row: SupabaseTripRow): TripRecord =>
+  normalizeTrip({
   id: row.id,
   ownerId: row.owner_id,
   title: row.title,

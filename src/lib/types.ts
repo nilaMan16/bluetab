@@ -3,6 +3,8 @@ export type ItineraryItem = {
   title: string;
   day: string;
   time: string;
+  location: string;
+  mapUrl: string;
   notes: string;
   cost: number;
 };

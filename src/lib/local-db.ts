@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type { TripRecord } from "./types";
+import { normalizeTrip } from "./utils";
 
 class JourneyDatabase extends Dexie {
   trips!: Table<TripRecord, string>;
@@ -14,11 +15,14 @@ class JourneyDatabase extends Dexie {
 
 export const db = new JourneyDatabase();
 
-export const loadLocalTrips = () => db.trips.orderBy("updatedAt").reverse().toArray();
+export const loadLocalTrips = async () => {
+  const trips = await db.trips.orderBy("updatedAt").reverse().toArray();
+  return trips.map(normalizeTrip);
+};
 
 export const saveLocalTrip = async (trip: TripRecord) => {
   await db.trips.put({
-    ...trip,
+    ...normalizeTrip(trip),
     updatedAt: new Date().toISOString()
   });
 };

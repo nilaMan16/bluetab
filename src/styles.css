@@ -750,6 +750,24 @@ label {
   margin-top: 0.45rem;
 }
 
+.route-stop-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.route-stop-tag {
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 251, 244, 0.78);
+  border: 1px solid rgba(118, 101, 72, 0.12);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  color: var(--green-deep);
+}
+
 .route-pin {
   position: absolute;
   width: 42px;
@@ -844,6 +862,21 @@ label {
   gap: 0.7rem;
 }
 
+.place-card-title {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.place-card-title strong,
+.place-card-title span {
+  display: block;
+}
+
+.place-card-title span {
+  color: var(--ink-soft);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
 .sequence-badge {
   width: 38px;
   height: 38px;
@@ -862,6 +895,7 @@ label {
 }
 
 .three-column,
+.two-column,
 .member-list,
 .stacked-row {
   display: grid;
@@ -870,6 +904,10 @@ label {
 
 .three-column {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.two-column {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .checkbox-row {
@@ -940,6 +978,60 @@ label {
 
 .auth-panel {
   padding: 0.45rem;
+}
+
+.onboarding-card,
+.onboarding-copy,
+.onboarding-actions,
+.onboarding-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.onboarding-card {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 1.2rem;
+  background:
+    linear-gradient(145deg, rgba(250, 244, 232, 0.96), rgba(236, 242, 230, 0.86)),
+    var(--card-strong);
+}
+
+.onboarding-copy h2,
+.onboarding-copy p {
+  margin: 0;
+}
+
+.onboarding-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onboarding-choice {
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(118, 101, 72, 0.12);
+  background: rgba(255, 251, 244, 0.74);
+  color: inherit;
+  text-align: left;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.onboarding-choice.active {
+  background: linear-gradient(140deg, rgba(110, 139, 103, 0.92), rgba(89, 121, 83, 0.88));
+  color: #fff8ee;
+  box-shadow: 0 14px 28px rgba(82, 104, 74, 0.18);
+}
+
+.onboarding-panel {
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(255, 251, 244, 0.72);
+  border: 1px solid rgba(118, 101, 72, 0.1);
+}
+
+.status-line {
+  margin: 0;
 }
 
 .invite-card .invite-layout {
@@ -1015,6 +1107,10 @@ label {
 
   .header-actions {
     flex-wrap: wrap;
+  }
+
+  .onboarding-actions {
+    grid-template-columns: 1fr;
   }
 
   .planner-header {

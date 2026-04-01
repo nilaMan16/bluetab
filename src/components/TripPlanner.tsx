@@ -154,10 +154,11 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
   const [trips, setTrips] = useState<TripRecord[]>([]);
   const [activeTripId, setActiveTripId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<PlannerTab>("overview");
-  const [status, setStatus] = useState("Loading your travel notebook...");
+  const [status, setStatus] = useState("Choose whether to create a trip or join a group.");
   const [joinCode, setJoinCode] = useState("");
   const [tripSwitcherOpen, setTripSwitcherOpen] = useState(false);
   const [lowDataMode, setLowDataMode] = useState(false);
+  const [entryMode, setEntryMode] = useState<"choose" | "create" | "join">("choose");
 
   useEffect(() => {
     const connection = (
@@ -192,10 +193,8 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
         setTrips(localTrips);
         setActiveTripId(localTrips[0].id);
       } else {
-        const starter = buildBlankTrip();
-        await saveLocalTrip(starter);
-        setTrips([starter]);
-        setActiveTripId(starter.id);
+        setTrips([]);
+        setActiveTripId("");
       }
 
       if (session && !offlineOnly) {
@@ -206,13 +205,13 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
             setActiveTripId((current) => current || cloudTrips[0].id);
             setStatus("Cloud sync is active.");
           } else {
-            setStatus("Offline-first mode is ready. Your cloud space is empty for now.");
+            setStatus("Create a trip or join a group with a Group ID.");
           }
         } catch (error) {
           setStatus(error instanceof Error ? error.message : "Cloud sync is temporarily unavailable.");
         }
       } else {
-        setStatus("Working locally. You can still plan everything offline.");
+        setStatus("Working locally. Sign in when you want to sync or join a group.");
       }
     };
 
@@ -250,12 +249,25 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
   };
 
   const createTrip = async () => {
-    const freshTrip = buildBlankTrip({
-      title: `Trip ${trips.length + 1}`
-    });
+    const freshTrip = buildBlankTrip();
     await saveLocalTrip(freshTrip);
-    setTrips((current) => [freshTrip, ...current]);
-    setActiveTripId(freshTrip.id);
+
+    let nextTrip = freshTrip;
+    if (session && !offlineOnly) {
+      try {
+        nextTrip = await syncTripToCloud(freshTrip, session);
+        setStatus("Trip created and synced. Share the Group ID with your friends.");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Trip created locally. Sign in to sync and share the Group ID.");
+      }
+    } else {
+      setStatus("Trip created locally. Sign in to sync it before sharing the Group ID.");
+    }
+
+    setTrips((current) => [nextTrip, ...current]);
+    setActiveTripId(nextTrip.id);
+    setActiveTab("overview");
+    setEntryMode("choose");
   };
 
   const deleteTrip = async () => {
@@ -281,7 +293,9 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
         return [joinedTrip, ...withoutCurrent];
       });
       setActiveTripId(joinedTrip.id);
+      setActiveTab("overview");
       setJoinCode("");
+      setEntryMode("choose");
       setStatus(`Joined ${joinedTrip.title}.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to join trip.");
@@ -289,7 +303,70 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
   };
 
   if (!activeTrip) {
-    return null;
+    return (
+      <div className="planner-v2">
+        <section className="planner-header card">
+          <div className="brand-lockup">
+            <img src="/bluetab-logo.png" alt="BlueTab logo" className="brand-logo-image" />
+            <div>
+              <h2>BlueTab</h2>
+              <p className="eyebrow">Journey Planner</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="card onboarding-card">
+          <div className="onboarding-copy">
+            <p className="eyebrow">Start here</p>
+            <h2>Create or join</h2>
+            <p className="muted">Start a fresh trip or enter a Group ID to join friends.</p>
+          </div>
+
+          <div className="onboarding-actions">
+            <button
+              type="button"
+              className={`onboarding-choice ${entryMode === "create" ? "active" : ""}`}
+              onClick={() => setEntryMode("create")}
+            >
+              Create trip
+            </button>
+            <button
+              type="button"
+              className={`onboarding-choice ${entryMode === "join" ? "active" : ""}`}
+              onClick={() => setEntryMode("join")}
+            >
+              Join group
+            </button>
+          </div>
+
+          {entryMode === "create" ? (
+            <div className="onboarding-panel">
+              <p className="muted">Your trip is created instantly. If you are signed in, it will sync online right away.</p>
+              <button type="button" className="primary-button" onClick={createTrip}>
+                Create trip
+              </button>
+            </div>
+          ) : null}
+
+          {entryMode === "join" ? (
+            <div className="onboarding-panel">
+              <input
+                value={joinCode}
+                placeholder="Enter Group ID"
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              />
+              <button type="button" className="primary-button" onClick={handleJoinTrip} disabled={!session}>
+                Join group
+              </button>
+              <p className="helper">{session ? "Enter the Group ID shared by your trip creator." : "Sign in to join a shared group."}</p>
+              {session ? <p className="status-line">{status}</p> : null}
+            </div>
+          ) : null}
+
+          {entryMode === "choose" ? <p className="helper">{status}</p> : null}
+        </section>
+      </div>
+    );
   }
 
   const recommendedBudget = totalTripBudget(activeTrip);
@@ -308,13 +385,19 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
   const plannedPercent = activeTrip.checklist.length
     ? Math.round((activeTrip.checklist.filter((item) => item.done).length / activeTrip.checklist.length) * 100)
     : 0;
+  const mappedStops = activeTrip.itinerary
+    .map((item) => ({
+      id: item.id,
+      name: item.title.trim(),
+      address: item.location.trim(),
+      mapUrl: item.mapUrl.trim() || toMapSearchUrl(item.location.trim())
+    }))
+    .filter((item) => item.name || item.address);
   const placesRouteLabel = `${activeTrip.destination || "Trip"} Route`;
   const primaryMapUrl =
-    activeTrip.places.find((place) => place.mapUrl)?.mapUrl ||
-    toMapSearchUrl(
-      activeTrip.places.map((place) => place.address || place.name).filter(Boolean).join(" ")
-    );
-  const estimatedJourneyKm = Math.max(activeTrip.places.length * 168, activeTrip.itinerary.length * 42, 0);
+    mappedStops.find((place) => place.mapUrl)?.mapUrl ||
+    toMapSearchUrl(mappedStops.map((place) => place.address || place.name).filter(Boolean).join(" "));
+  const estimatedJourneyKm = Math.max(mappedStops.length * 168, activeTrip.itinerary.length * 42, 0);
   const memberNames = activeTrip.members.map((member) => member.name.trim()).filter(Boolean);
   const expenseBalances = buildBalanceMap(activeTrip);
   const settlements = buildSettlements(expenseBalances);
@@ -340,7 +423,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
 
   const topStats = [
     { label: "Days", value: tripDays || "--" },
-    { label: "Places", value: activeTrip.places.length || 0 },
+    { label: "Places", value: mappedStops.length || 0 },
     { label: "Budget", value: formatMoney(recommendedBudget, "INR") },
     { label: "Travelers", value: activeTrip.members.length || 1 }
   ];
@@ -427,6 +510,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 <input
                   className="hero-title"
                   value={activeTrip.title}
+                  placeholder="Add trip name"
                   onChange={(e) => void updateTrip((trip) => ({ ...trip, title: e.target.value }))}
                 />
               </div>
@@ -481,8 +565,8 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
           <article className="card summary-card">
             <span className="icon-badge">🏨</span>
             <div>
-              <strong>{activeTrip.places.filter((place) => /hotel|stay|resort/i.test(place.category)).length}</strong>
-              <span>Hotels</span>
+              <strong>{mappedStops.length}</strong>
+              <span>Mapped</span>
             </div>
           </article>
           <article className="card summary-card">
@@ -512,6 +596,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 Destination
                 <input
                   value={activeTrip.destination}
+                  placeholder="Add destination"
                   onChange={(e) => void updateTrip((trip) => ({ ...trip, destination: e.target.value }))}
                 />
               </label>
@@ -525,6 +610,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
             </div>
             <textarea
               value={activeTrip.tagline}
+              placeholder="Add a short note"
               onChange={(e) => void updateTrip((trip) => ({ ...trip, tagline: e.target.value }))}
             />
           </article>
@@ -541,7 +627,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 onClick={() =>
                   void updateTrip((trip) => ({
                     ...trip,
-                    members: [...trip.members, { id: uid(), name: "New friend" }]
+                    members: [...trip.members, { id: uid(), name: "" }]
                   }))
                 }
               >
@@ -554,6 +640,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                   <span className="sequence-badge">{String(index + 1).padStart(2, "0")}</span>
                   <input
                     value={member.name}
+                    placeholder="Add member name"
                     onChange={(e) =>
                       void updateTrip((trip) => ({
                         ...trip,
@@ -574,13 +661,17 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
             <div className="stacked-row">
               <input
                 value={joinCode}
+                placeholder="Enter Group ID"
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               />
               <button className="ghost-button compact-button" type="button" onClick={handleJoinTrip} disabled={!session}>
                 Join group
               </button>
             </div>
-            <p className="helper">{session ? status : "Sign in first to join shared trips."}</p>
+            <p className="helper">
+              {session ? "Join another group anytime with its Group ID." : "Sign in to join another shared group."}
+            </p>
+            {session ? <p className="status-line">{status}</p> : null}
           </article>
           </section>
         </>
@@ -606,6 +697,8 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                         title: "",
                         day: trip.startDate,
                         time: "09:00",
+                        location: "",
+                        mapUrl: "",
                         notes: "",
                       cost: 0
                     }
@@ -624,6 +717,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                   </div>
                 <input
                   value={item.title}
+                  placeholder="Add stop name"
                   onChange={(e) =>
                     void updateTrip((trip) => ({
                       ...trip,
@@ -671,6 +765,40 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                     }
                   />
                 </div>
+                <div className="two-column">
+                  <input
+                    value={item.location}
+                    placeholder="Add location"
+                    onChange={(e) =>
+                      void updateTrip((trip) => ({
+                        ...trip,
+                        itinerary: trip.itinerary.map((entry) =>
+                          entry.id === item.id
+                            ? {
+                                ...entry,
+                                location: e.target.value,
+                                mapUrl:
+                                  entry.mapUrl ||
+                                  (e.target.value.trim() ? toMapSearchUrl(e.target.value.trim()) : "")
+                              }
+                            : entry
+                        )
+                      }))
+                    }
+                  />
+                  <input
+                    value={item.mapUrl}
+                    placeholder="Paste map link"
+                    onChange={(e) =>
+                      void updateTrip((trip) => ({
+                        ...trip,
+                        itinerary: trip.itinerary.map((entry) =>
+                          entry.id === item.id ? { ...entry, mapUrl: e.target.value } : entry
+                        )
+                      }))
+                    }
+                  />
+                </div>
                 <textarea
                   value={item.notes}
                   onChange={(e) =>
@@ -683,6 +811,11 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                   }
                   placeholder="Add notes"
                 />
+                {item.mapUrl || item.location ? (
+                  <a href={item.mapUrl || toMapSearchUrl(item.location)} target="_blank" rel="noreferrer">
+                    Open map
+                  </a>
+                ) : null}
               </div>
             ))}
             {!activeTrip.itinerary.length ? <p className="helper">Start with major stops, then fill in time and costs.</p> : null}
@@ -704,122 +837,50 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 decoding="async"
               />
             ) : null}
-            <div className="route-pin route-pin-green">★</div>
-            <div className="route-pin route-pin-blue">★</div>
-            <div className="route-pin route-pin-amber">★</div>
-            <div className="route-pin route-pin-orange">★</div>
+            {mappedStops.slice(0, 4).map((stop, index) => (
+              <div
+                key={stop.id}
+                className={`route-pin ${["route-pin-green", "route-pin-blue", "route-pin-amber", "route-pin-orange"][index]}`}
+              >
+                <span>{stop.name.slice(0, 1).toUpperCase() || "•"}</span>
+              </div>
+            ))}
             <div className="route-map-content">
               <div className="route-map-icon">🗺️</div>
               <h3>{placesRouteLabel}</h3>
               <p className="muted">
-                {activeTrip.places.length} places saved · {estimatedJourneyKm} km journey
+                {mappedStops.length} places mapped · {estimatedJourneyKm} km journey
               </p>
               <a href={primaryMapUrl} target="_blank" rel="noreferrer" className="ghost-button route-map-button">
                 Open full map ↗
               </a>
+              {mappedStops.length ? (
+                <div className="route-stop-tags">
+                  {mappedStops.slice(0, 4).map((stop) => (
+                    <span key={stop.id} className="route-stop-tag">
+                      {stop.name || stop.address}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
           <div className="section-head">
             <div>
-              <p className="eyebrow">Saved spots</p>
+              <p className="eyebrow">Mapped from itinerary</p>
               <h3>Places</h3>
             </div>
-            <button
-              className="ghost-button compact-button"
-              type="button"
-              onClick={() =>
-                void updateTrip((trip) => ({
-                  ...trip,
-                  places: [
-                    ...trip.places,
-                    {
-                      id: uid(),
-                      name: "",
-                      address: "",
-                      mapUrl: "",
-                      estimate: 0,
-                      category: ""
-                    }
-                  ]
-                }))
-              }
-            >
-              Add place
-            </button>
           </div>
           <div className="stack-list">
-            {activeTrip.places.map((place, index) => (
+            {mappedStops.map((place, index) => (
               <div key={place.id} className="list-card">
                 <div className="list-card-head">
                   <span className="sequence-badge">{String(index + 1).padStart(2, "0")}</span>
-                </div>
-                <input
-                  value={place.name}
-                  onChange={(e) =>
-                    void updateTrip((trip) => ({
-                      ...trip,
-                      places: trip.places.map((entry) =>
-                        entry.id === place.id ? { ...entry, name: e.target.value } : entry
-                      )
-                    }))
-                  }
-                />
-                <input
-                  value={place.address}
-                  onChange={(e) =>
-                    void updateTrip((trip) => ({
-                      ...trip,
-                      places: trip.places.map((entry) =>
-                        entry.id === place.id
-                          ? {
-                              ...entry,
-                              address: e.target.value,
-                              mapUrl: entry.mapUrl || toMapSearchUrl(e.target.value)
-                            }
-                          : entry
-                      )
-                    }))
-                  }
-                  placeholder="Add address"
-                />
-                <div className="three-column">
-                  <input
-                    value={place.category}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        places: trip.places.map((entry) =>
-                          entry.id === place.id ? { ...entry, category: e.target.value } : entry
-                        )
-                      }))
-                    }
-                  />
-                  <input
-                    type="number"
-                    value={place.estimate}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        places: trip.places.map((entry) =>
-                          entry.id === place.id ? { ...entry, estimate: Number(e.target.value) } : entry
-                        )
-                      }))
-                    }
-                    placeholder="Add estimate"
-                  />
-                  <input
-                    value={place.mapUrl}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        places: trip.places.map((entry) =>
-                          entry.id === place.id ? { ...entry, mapUrl: e.target.value } : entry
-                        )
-                      }))
-                    }
-                    placeholder="Add map URL"
-                  />
+                  <div className="place-card-title">
+                    <strong>{place.name || `Stop ${index + 1}`}</strong>
+                    <span>{place.address || "Location not added yet"}</span>
+                  </div>
                 </div>
                 {place.mapUrl ? (
                   <a href={place.mapUrl} target="_blank" rel="noreferrer">
@@ -828,7 +889,9 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
                 ) : null}
               </div>
             ))}
-            {!activeTrip.places.length ? <p className="helper">Keep your must-visit stops, food spots, and stays here.</p> : null}
+            {!mappedStops.length ? (
+              <p className="helper">Add a location or map link to your itinerary stops and they will appear here automatically.</p>
+            ) : null}
           </div>
         </section>
       ) : null}
