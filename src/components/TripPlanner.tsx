@@ -222,6 +222,7 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
     () => trips.find((trip) => trip.id === activeTripId) ?? trips[0] ?? null,
     [activeTripId, trips]
   );
+  const canCreateShareableTrip = Boolean(session) && !offlineOnly;
 
   const updateTrip = async (updater: (trip: TripRecord) => TripRecord) => {
     if (!activeTrip) {
@@ -249,21 +250,29 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
   };
 
   const createTrip = async () => {
-    const freshTrip = buildBlankTrip();
-    await saveLocalTrip(freshTrip);
-
-    let nextTrip = freshTrip;
-    if (session && !offlineOnly) {
-      try {
-        nextTrip = await syncTripToCloud(freshTrip, session);
-        setStatus("Trip created and synced. Share the Group ID with your friends.");
-      } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Trip created locally. Sign in to sync and share the Group ID.");
-      }
-    } else {
-      setStatus("Trip created locally. Sign in to sync it before sharing the Group ID.");
+    if (!session) {
+      setStatus("Sign in first so your new trip can get a Group ID and sync to the cloud.");
+      return;
     }
 
+    if (offlineOnly) {
+      setStatus("Reconnect to the internet to create and share a new group.");
+      return;
+    }
+
+    const freshTrip = buildBlankTrip();
+    setStatus("Creating trip and syncing Group ID...");
+
+    let nextTrip = freshTrip;
+    try {
+      nextTrip = await syncTripToCloud(freshTrip, session);
+      setStatus(`Trip created and synced. Group ID: ${nextTrip.inviteCode}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "We could not sync the trip right now. Please try again.");
+      return;
+    }
+
+    await saveLocalTrip(nextTrip);
     setTrips((current) => [nextTrip, ...current]);
     setActiveTripId(nextTrip.id);
     setActiveTab("overview");
@@ -341,10 +350,17 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
 
           {entryMode === "create" ? (
             <div className="onboarding-panel">
-              <p className="muted">Your trip is created instantly. If you are signed in, it will sync online right away.</p>
-              <button type="button" className="primary-button" onClick={createTrip}>
+              <p className="muted">A Group ID is assigned automatically and the trip is synced online as soon as it is created.</p>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={createTrip}
+                disabled={!canCreateShareableTrip}
+              >
                 Create trip
               </button>
+              {!session ? <p className="helper">Sign in to create a shareable trip.</p> : null}
+              {session && offlineOnly ? <p className="helper">Reconnect to create and sync a new trip.</p> : null}
             </div>
           ) : null}
 
@@ -483,7 +499,12 @@ export function TripPlanner({ session, offlineOnly }: TripPlannerProps) {
             </div>
           ) : null}
         </div>
-        <button className="primary-button compact-button" type="button" onClick={createTrip}>
+        <button
+          className="primary-button compact-button"
+          type="button"
+          onClick={createTrip}
+          disabled={!canCreateShareableTrip}
+        >
           New trip
         </button>
       </section>
