@@ -229,8 +229,6 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
     () => trips.find((trip) => trip.id === activeTripId) ?? trips[0] ?? null,
     [activeTripId, trips]
   );
-  const canCreateShareableTrip = Boolean(session) && !offlineOnly;
-
   const updateTrip = async (updater: (trip: TripRecord) => TripRecord) => {
     if (!activeTrip) {
       return;
@@ -370,12 +368,12 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
                 type="button"
                 className="primary-button"
                 onClick={createTrip}
-                disabled={!canCreateShareableTrip}
               >
                 Create trip
               </button>
               {!session ? <p className="helper">Sign in to create a shareable trip.</p> : null}
               {session && offlineOnly ? <p className="helper">Reconnect to create and sync a new trip.</p> : null}
+              <p className="status-line">{status}</p>
             </div>
           ) : null}
 
@@ -518,7 +516,6 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
           className="primary-button compact-button"
           type="button"
           onClick={createTrip}
-          disabled={!canCreateShareableTrip}
         >
           New trip
         </button>
