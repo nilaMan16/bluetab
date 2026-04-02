@@ -262,6 +262,12 @@ label {
   white-space: nowrap;
 }
 
+.tab-chip.active {
+  background: rgba(255, 255, 255, 0.92);
+  color: #34291d;
+  box-shadow: 0 10px 20px rgba(125, 111, 82, 0.08);
+}
+
 .trip-pill {
   display: grid;
   gap: 0.15rem;
@@ -378,6 +384,15 @@ label {
     var(--card-strong);
 }
 
+.hero-panel::after {
+  content: "";
+  grid-column: 1 / -1;
+  height: 1px;
+  border-top: 2px dashed rgba(218, 191, 150, 0.7);
+  order: -1;
+  margin-top: 3.2rem;
+}
+
 .hero-copy {
   display: grid;
   gap: 1rem;
@@ -490,6 +505,207 @@ label {
 .split-side {
   display: grid;
   gap: 0.9rem;
+}
+
+.budget-wide,
+.group-layout,
+.notes-layout,
+.day-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.budget-wide {
+  grid-column: 1 / -1;
+}
+
+.budget-head {
+  margin-bottom: -0.25rem;
+}
+
+.day-card,
+.group-hero-card,
+.notes-editor-card {
+  background: rgba(255, 251, 244, 0.72);
+  border: 1px solid rgba(118, 101, 72, 0.1);
+  border-radius: 22px;
+  padding: 1rem;
+}
+
+.day-card-head,
+.day-card-title,
+.group-hero-header,
+.group-share-actions,
+.group-member-card,
+.split-mode-tabs,
+.split-summary-grid,
+.expense-table-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.day-card-head,
+.group-hero-header,
+.group-member-card,
+.expense-table-head {
+  justify-content: space-between;
+}
+
+.day-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #7ea89c, #97b49f);
+  color: #fff9ed;
+  font-size: 1.35rem;
+  box-shadow: 0 10px 20px rgba(102, 126, 95, 0.16);
+}
+
+.day-card-title h4,
+.group-hero-header h3 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.full-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.group-hero-card {
+  background:
+    linear-gradient(180deg, rgba(239, 244, 235, 0.9), rgba(249, 244, 236, 0.95)),
+    var(--card-strong);
+}
+
+.group-code-panel {
+  margin: 0.6rem 0;
+  padding: 1.4rem 1rem;
+  border-radius: 24px;
+  border: 2px dashed rgba(152, 188, 142, 0.45);
+  text-align: center;
+  background: rgba(255, 251, 244, 0.72);
+}
+
+.group-code-display {
+  border: none;
+  background: transparent;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  margin: 0.35rem 0;
+}
+
+.group-share-actions {
+  flex-wrap: wrap;
+}
+
+.group-member-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.group-member-card {
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(118, 101, 72, 0.1);
+  background: rgba(255, 252, 247, 0.8);
+}
+
+.group-member-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(227, 237, 219, 0.96), rgba(244, 236, 220, 0.96));
+  color: var(--green-deep);
+  font-weight: 700;
+}
+
+.group-member-meta {
+  display: grid;
+  gap: 0.2rem;
+  margin-right: auto;
+}
+
+.group-member-meta span,
+.group-member-status,
+.group-link-preview {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--ink-soft);
+}
+
+.group-member-status {
+  white-space: nowrap;
+}
+
+.split-mode-tabs {
+  padding: 0.35rem;
+  border-radius: 18px;
+  background: rgba(245, 238, 227, 0.9);
+  justify-content: stretch;
+}
+
+.split-mode-tab {
+  flex: 1 1 0;
+  min-height: 46px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.split-mode-tab.active {
+  background: rgba(255, 255, 255, 0.92);
+  color: #2f2b21;
+  box-shadow: 0 8px 18px rgba(125, 111, 82, 0.08);
+}
+
+.split-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.positive-text {
+  color: #4f8a4f;
+}
+
+.expense-table-head {
+  padding: 0.6rem 1rem 0.9rem;
+  border-bottom: 1px solid rgba(118, 101, 72, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+.expense-table-head span,
+.expense-table .recent-expense-row > * {
+  flex: 1 1 0;
+}
+
+.expense-table .recent-expense-row {
+  border-bottom: 1px solid rgba(118, 101, 72, 0.08);
+  border-radius: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.packing-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.notes-editor {
+  min-height: 260px;
+  border: none;
+  background: rgba(255, 251, 244, 0.56);
 }
 
 .split-balance-grid,
@@ -1074,7 +1290,8 @@ label {
   .budget-layout,
   .split-layout,
   .compact-form,
-  .member-list {
+  .member-list,
+  .split-summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1084,6 +1301,10 @@ label {
 
   .hero-illustration {
     padding-top: 0.25rem;
+  }
+
+  .expense-table-head {
+    display: none;
   }
 }
 
@@ -1110,6 +1331,19 @@ label {
   }
 
   .onboarding-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .day-card-head,
+  .group-member-card,
+  .group-hero-header,
+  .group-share-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .three-column,
+  .two-column {
     grid-template-columns: 1fr;
   }
 

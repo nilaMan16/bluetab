@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { loadLocalTrips, removeLocalTrip, saveLocalTrip } from "../lib/local-db";
 import {
   buildBlankTrip,
+  createInviteCode,
   defaultExpenseCategory,
   expenseCategories,
   expensePerPerson,
@@ -14,7 +15,6 @@ import {
   uid
 } from "../lib/utils";
 import type { TripRecord } from "../lib/types";
-import { InviteCard } from "./InviteCard";
 
 type TripPlannerProps = {
   session: Session | null;
@@ -22,15 +22,18 @@ type TripPlannerProps = {
   preferredEntryMode?: "choose" | "create";
 };
 
-type PlannerTab = "overview" | "itinerary" | "places" | "budget" | "split" | "packing";
+type PlannerTab = "overview" | "itinerary" | "places" | "budget" | "group" | "split" | "packing" | "notes";
+type SplitView = "expenses" | "balances" | "settle" | "activity";
 
 const tabs: Array<{ id: PlannerTab; label: string; icon: string }> = [
   { id: "overview", label: "Overview", icon: "🗺️" },
   { id: "itinerary", label: "Itinerary", icon: "🗓️" },
   { id: "places", label: "Places", icon: "📍" },
   { id: "budget", label: "Budget", icon: "💰" },
-  { id: "split", label: "Split", icon: "🤝" },
-  { id: "packing", label: "Packing", icon: "🎒" }
+  { id: "group", label: "Group", icon: "👥" },
+  { id: "split", label: "Split", icon: "💸" },
+  { id: "packing", label: "Packing", icon: "🎒" },
+  { id: "notes", label: "Notes", icon: "📝" }
 ];
 
 type Settlement = {
@@ -155,6 +158,7 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
   const [trips, setTrips] = useState<TripRecord[]>([]);
   const [activeTripId, setActiveTripId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<PlannerTab>("overview");
+  const [splitView, setSplitView] = useState<SplitView>("expenses");
   const [status, setStatus] = useState("Choose whether to create a trip or join a group.");
   const [joinCode, setJoinCode] = useState("");
   const [tripSwitcherOpen, setTripSwitcherOpen] = useState(false);
@@ -229,6 +233,67 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
     () => trips.find((trip) => trip.id === activeTripId) ?? trips[0] ?? null,
     [activeTripId, trips]
   );
+
+  const addExpense = async () => {
+    if (!activeTrip) {
+      return;
+    }
+
+    await updateTrip((trip) => ({
+      ...trip,
+      expenses: [
+        ...trip.expenses,
+        {
+          id: uid(),
+          title: "",
+          amount: 0,
+          category: defaultExpenseCategory,
+          date: new Date().toISOString().slice(0, 10),
+          paidBy: trip.members[0]?.name || "",
+          splitBetween: trip.members.map((member) => member.name).filter(Boolean)
+        }
+      ]
+    }));
+    setActiveTab("split");
+    setSplitView("expenses");
+  };
+
+  const addItineraryStop = async (dayValue?: string) => {
+    if (!activeTrip) {
+      return;
+    }
+
+    await updateTrip((trip) => ({
+      ...trip,
+      itinerary: [
+        ...trip.itinerary,
+        {
+          id: uid(),
+          title: "",
+          day: dayValue ?? trip.startDate ?? "",
+          time: "09:00",
+          location: "",
+          mapUrl: "",
+          notes: "",
+          cost: 0
+        }
+      ]
+    }));
+  };
+
+  const addItineraryDay = async () => {
+    const sortedDays = (activeTrip?.itinerary || [])
+      .map((item) => item.day)
+      .filter(Boolean)
+      .sort();
+    const nextDay = sortedDays[sortedDays.length - 1] || activeTrip?.startDate || "";
+
+    const resolvedDay = nextDay
+      ? new Date(new Date(nextDay).getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      : "";
+
+    await addItineraryStop(resolvedDay);
+  };
   const updateTrip = async (updater: (trip: TripRecord) => TripRecord) => {
     if (!activeTrip) {
       return;
@@ -449,6 +514,19 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
   const recentExpenses = [...activeTrip.expenses]
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
     .slice(0, 6);
+  const groupedItinerary = Array.from(
+    activeTrip.itinerary.reduce((map, item, index) => {
+      const key = item.day || `undated-${index}`;
+      const existing = map.get(key) || [];
+      existing.push(item);
+      map.set(key, existing);
+      return map;
+    }, new Map<string, typeof activeTrip.itinerary>())
+  );
+  const shareJoinLink =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/?join=${encodeURIComponent(activeTrip.inviteCode)}`
+      : activeTrip.inviteCode;
 
   const topStats = [
     { label: "Days", value: tripDays || "--" },
@@ -456,6 +534,35 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
     { label: "Budget", value: formatMoney(recommendedBudget, "INR") },
     { label: "Travelers", value: activeTrip.members.length || 1 }
   ];
+
+  const copyGroupCode = async () => {
+    try {
+      await navigator.clipboard.writeText(activeTrip.inviteCode);
+      setStatus("Group ID copied.");
+    } catch {
+      setStatus("Could not copy the Group ID.");
+    }
+  };
+
+  const copyJoinLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareJoinLink);
+      setStatus("Join link copied.");
+    } catch {
+      setStatus("Could not copy the join link.");
+    }
+  };
+
+  const shareOnWhatsApp = () => {
+    const text = encodeURIComponent(`Join my BlueTab trip with Group ID ${activeTrip.inviteCode}\n${shareJoinLink}`);
+    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
+  };
+
+  const regenerateGroupCode = () =>
+    void updateTrip((trip) => ({
+      ...trip,
+      inviteCode: createInviteCode()
+    }));
 
   return (
     <div className="planner-v2">
@@ -714,144 +821,151 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
         <section className="card">
           <div className="section-head">
             <div>
-              <p className="eyebrow">Plan the route</p>
-              <h3>Itinerary</h3>
+              <p className="eyebrow">Your journey unfolding</p>
+              <h3>Day by Day</h3>
             </div>
             <button
               className="ghost-button compact-button"
               type="button"
-              onClick={() =>
-                void updateTrip((trip) => ({
-                  ...trip,
-                  itinerary: [
-                    ...trip.itinerary,
-                      {
-                        id: uid(),
-                        title: "",
-                        day: trip.startDate,
-                        time: "09:00",
-                        location: "",
-                        mapUrl: "",
-                        notes: "",
-                      cost: 0
-                    }
-                  ]
-                }))
-              }
+              onClick={() => void addItineraryStop()}
             >
-              Add stop
+              + Add event
             </button>
           </div>
-          <div className="stack-list">
-            {activeTrip.itinerary.map((item, index) => (
-                <div key={item.id} className="list-card">
-                  <div className="list-card-head">
-                    <span className="sequence-badge">{String(index + 1).padStart(2, "0")}</span>
+          <div className="day-stack">
+            {groupedItinerary.map(([groupKey, items], dayIndex) => (
+              <article key={groupKey} className="day-card">
+                <div className="day-card-head">
+                  <div className="day-card-title">
+                    <span className="day-badge">{dayIndex + 1}</span>
+                    <div>
+                      <h4>{`Day ${dayIndex + 1}`}</h4>
+                      <p className="helper">{groupKey.startsWith("undated-") ? "Date not set" : groupKey}</p>
+                    </div>
                   </div>
-                <input
-                  value={item.title}
-                  placeholder="Add stop name"
-                  onChange={(e) =>
-                    void updateTrip((trip) => ({
-                      ...trip,
-                      itinerary: trip.itinerary.map((entry) =>
-                        entry.id === item.id ? { ...entry, title: e.target.value } : entry
-                      )
-                    }))
-                  }
-                />
-                <div className="three-column">
-                  <input
-                    type="date"
-                    value={item.day}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        itinerary: trip.itinerary.map((entry) =>
-                          entry.id === item.id ? { ...entry, day: e.target.value } : entry
-                        )
-                      }))
-                    }
-                  />
-                  <input
-                    type="time"
-                    value={item.time}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        itinerary: trip.itinerary.map((entry) =>
-                          entry.id === item.id ? { ...entry, time: e.target.value } : entry
-                        )
-                      }))
-                    }
-                  />
-                  <input
-                    type="number"
-                    value={item.cost}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        itinerary: trip.itinerary.map((entry) =>
-                          entry.id === item.id ? { ...entry, cost: Number(e.target.value) } : entry
-                        )
-                      }))
-                    }
-                  />
+                  <button
+                    className="ghost-button compact-button"
+                    type="button"
+                    onClick={() => void addItineraryStop(groupKey.startsWith("undated-") ? "" : groupKey)}
+                  >
+                    + Add event
+                  </button>
                 </div>
-                <div className="two-column">
-                  <input
-                    value={item.location}
-                    placeholder="Add location"
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        itinerary: trip.itinerary.map((entry) =>
-                          entry.id === item.id
-                            ? {
-                                ...entry,
-                                location: e.target.value,
-                                mapUrl:
-                                  entry.mapUrl ||
-                                  (e.target.value.trim() ? toMapSearchUrl(e.target.value.trim()) : "")
-                              }
-                            : entry
-                        )
-                      }))
-                    }
-                  />
-                  <input
-                    value={item.mapUrl}
-                    placeholder="Paste map link"
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        itinerary: trip.itinerary.map((entry) =>
-                          entry.id === item.id ? { ...entry, mapUrl: e.target.value } : entry
-                        )
-                      }))
-                    }
-                  />
+
+                <div className="stack-list">
+                  {items.map((item) => (
+                    <div key={item.id} className="list-card">
+                      <input
+                        value={item.title}
+                        placeholder="Add event"
+                        onChange={(e) =>
+                          void updateTrip((trip) => ({
+                            ...trip,
+                            itinerary: trip.itinerary.map((entry) =>
+                              entry.id === item.id ? { ...entry, title: e.target.value } : entry
+                            )
+                          }))
+                        }
+                      />
+                      <div className="three-column">
+                        <input
+                          type="date"
+                          value={item.day}
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              itinerary: trip.itinerary.map((entry) =>
+                                entry.id === item.id ? { ...entry, day: e.target.value } : entry
+                              )
+                            }))
+                          }
+                        />
+                        <input
+                          type="time"
+                          value={item.time}
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              itinerary: trip.itinerary.map((entry) =>
+                                entry.id === item.id ? { ...entry, time: e.target.value } : entry
+                              )
+                            }))
+                          }
+                        />
+                        <input
+                          type="number"
+                          value={item.cost}
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              itinerary: trip.itinerary.map((entry) =>
+                                entry.id === item.id ? { ...entry, cost: Number(e.target.value) } : entry
+                              )
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="two-column">
+                        <input
+                          value={item.location}
+                          placeholder="Add location"
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              itinerary: trip.itinerary.map((entry) =>
+                                entry.id === item.id
+                                  ? {
+                                      ...entry,
+                                      location: e.target.value,
+                                      mapUrl:
+                                        entry.mapUrl ||
+                                        (e.target.value.trim() ? toMapSearchUrl(e.target.value.trim()) : "")
+                                    }
+                                  : entry
+                              )
+                            }))
+                          }
+                        />
+                        <input
+                          value={item.mapUrl}
+                          placeholder="Paste map link"
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              itinerary: trip.itinerary.map((entry) =>
+                                entry.id === item.id ? { ...entry, mapUrl: e.target.value } : entry
+                              )
+                            }))
+                          }
+                        />
+                      </div>
+                      <textarea
+                        value={item.notes}
+                        onChange={(e) =>
+                          void updateTrip((trip) => ({
+                            ...trip,
+                            itinerary: trip.itinerary.map((entry) =>
+                              entry.id === item.id ? { ...entry, notes: e.target.value } : entry
+                            )
+                          }))
+                        }
+                        placeholder="Add notes"
+                      />
+                    </div>
+                  ))}
                 </div>
-                <textarea
-                  value={item.notes}
-                  onChange={(e) =>
-                    void updateTrip((trip) => ({
-                      ...trip,
-                      itinerary: trip.itinerary.map((entry) =>
-                        entry.id === item.id ? { ...entry, notes: e.target.value } : entry
-                      )
-                    }))
-                  }
-                  placeholder="Add notes"
-                />
-                {item.mapUrl || item.location ? (
-                  <a href={item.mapUrl || toMapSearchUrl(item.location)} target="_blank" rel="noreferrer">
-                    Open map
-                  </a>
-                ) : null}
-              </div>
+              </article>
             ))}
-            {!activeTrip.itinerary.length ? <p className="helper">Start with major stops, then fill in time and costs.</p> : null}
+            {!activeTrip.itinerary.length ? (
+              <button className="primary-button full-button" type="button" onClick={() => void addItineraryDay()}>
+                + Add New Day
+              </button>
+            ) : null}
+            {activeTrip.itinerary.length ? (
+              <button className="primary-button full-button" type="button" onClick={() => void addItineraryDay()}>
+                + Add New Day
+              </button>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -931,8 +1045,16 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
 
       {activeTab === "budget" ? (
         <section className="budget-layout">
+          <div className="section-head budget-head budget-wide">
+            <div>
+              <p className="eyebrow">Keep your coins in order</p>
+              <h3>Budget Tracker</h3>
+            </div>
+            <button className="primary-button compact-button" type="button" onClick={() => void addExpense()}>
+              + Add Expense
+            </button>
+          </div>
           <article className="card budget-hero-card">
-            <p className="eyebrow">Budget Tracker</p>
             <h3>Total Budget</h3>
             <div className="budget-amount">{formatMoney(spentTotal, "INR")}</div>
             <p className="muted">of {formatMoney(totalBudgetTarget, "INR")} total</p>
@@ -976,9 +1098,16 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
           </article>
 
           <article className="card budget-expenses-card">
-            <p className="eyebrow">Recent expenses</p>
-            <h3>Latest spending</h3>
-            <div className="recent-expense-list">
+            <p className="eyebrow">Expenses</p>
+            <h3>Recent Expenses</h3>
+            <div className="expense-table-head">
+              <span>Date</span>
+              <span>Description</span>
+              <span>Category</span>
+              <span>Paid by</span>
+              <span>Amount</span>
+            </div>
+            <div className="recent-expense-list expense-table">
               {recentExpenses.length ? (
                 recentExpenses.map((expense) => {
                   const category = categoryMetaByName.get(expense.category || defaultExpenseCategory);
@@ -995,9 +1124,90 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
                   );
                 })
               ) : (
-                <p className="helper">No expenses yet. Add them in Split to build this tracker.</p>
+                <p className="helper">No expenses yet</p>
               )}
             </div>
+          </article>
+        </section>
+      ) : null}
+
+      {activeTab === "group" ? (
+        <section className="group-layout">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Invite friends with your unique trip code</p>
+              <h3>Travel Crew</h3>
+            </div>
+            <button className="primary-button compact-button" type="button" onClick={regenerateGroupCode}>
+              New Code
+            </button>
+          </div>
+
+          <article className="card group-hero-card">
+            <div className="group-hero-header">
+              <div>
+                <h3>{activeTrip.title || "Untitled Trip"}</h3>
+                <p className="muted">{activeTrip.startDate && activeTrip.endDate ? `${activeTrip.startDate} to ${activeTrip.endDate}` : "Dates not set yet"}</p>
+              </div>
+            </div>
+
+            <div className="group-code-panel">
+              <p className="eyebrow">Your Trip Code</p>
+              <button type="button" className="group-code-display" onClick={() => void copyGroupCode()}>
+                {activeTrip.inviteCode}
+              </button>
+              <p className="helper">Click code to copy. Share with friends to join.</p>
+            </div>
+
+            <div className="group-share-actions">
+              <button className="ghost-button compact-button" type="button" onClick={shareOnWhatsApp}>
+                WhatsApp
+              </button>
+              <button className="ghost-button compact-button" type="button" onClick={() => void copyJoinLink()}>
+                Copy Link
+              </button>
+              <button className="ghost-button compact-button" type="button" onClick={() => void copyGroupCode()}>
+                Copy Code
+              </button>
+            </div>
+          </article>
+
+          <article className="card">
+            <div className="section-head">
+              <div>
+                <h3>Members ({activeTrip.members.length})</h3>
+              </div>
+              <button
+                className="ghost-button compact-button"
+                type="button"
+                onClick={() =>
+                  void updateTrip((trip) => ({
+                    ...trip,
+                    members: [...trip.members, { id: uid(), name: "" }]
+                  }))
+                }
+              >
+                + Add Friend
+              </button>
+            </div>
+            <div className="group-member-list">
+              {activeTrip.members.map((member, index) => (
+                <div key={member.id} className="group-member-card">
+                  <div className="group-member-avatar">{(member.name || "T").slice(0, 2).toUpperCase()}</div>
+                  <div className="group-member-meta">
+                    <strong>{member.name || `Traveler ${index + 1}`}</strong>
+                    <span>{index === 0 ? "Trip organizer" : "Member"}</span>
+                  </div>
+                  <span className="group-member-status">Online</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="card">
+            <h3>Pending Invites</h3>
+            <p className="helper">No pending invites</p>
+            <p className="muted group-link-preview">{shareJoinLink}</p>
           </article>
         </section>
       ) : null}
@@ -1007,213 +1217,247 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
           <article className="card">
             <div className="section-head">
               <div>
-                <p className="eyebrow">Shared expenses</p>
-                <h3>Split money</h3>
+                <p className="eyebrow">Splitwise-style, fair, clear, no awkwardness</p>
+                <h3>Split Expenses</h3>
               </div>
-              <button
-                className="ghost-button compact-button"
-                type="button"
-                onClick={() =>
-                  void updateTrip((trip) => ({
-                    ...trip,
-                    expenses: [
-                      ...trip.expenses,
-                      {
-                        id: uid(),
-                        title: "",
-                        amount: 0,
-                        category: defaultExpenseCategory,
-                        date: new Date().toISOString().slice(0, 10),
-                        paidBy: trip.members[0]?.name || "",
-                        splitBetween: trip.members.map((member) => member.name)
-                      }
-                    ]
-                  }))
-                }
-              >
-                Add expense
+              <button className="primary-button compact-button" type="button" onClick={() => void addExpense()}>
+                + Add Expense
               </button>
             </div>
-            <div className="split-balance-grid">
-              {balanceCards.map((entry) => (
-                <div key={entry.name} className={`split-balance-card ${entry.amount >= 0 ? "positive" : "negative"}`}>
-                  <span>{entry.name}</span>
-                  <strong>{formatMoney(Math.abs(entry.amount), "INR")}</strong>
-                  <small>{entry.amount >= 0 ? "gets back" : "owes"}</small>
-                </div>
+
+            <div className="split-mode-tabs">
+              {[
+                ["expenses", "All Expenses"],
+                ["balances", "Balances"],
+                ["settle", "Settle Up"],
+                ["activity", "Activity"]
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`split-mode-tab ${splitView === id ? "active" : ""}`}
+                  onClick={() => setSplitView(id as SplitView)}
+                >
+                  {label}
+                </button>
               ))}
             </div>
-            <div className="settlement-card">
-              <p className="eyebrow">Suggested settlements</p>
-              {settlements.length ? (
-                <div className="settlement-list">
-                  {settlements.map((settlement, index) => (
-                    <div key={`${settlement.from}-${settlement.to}-${index}`} className="settlement-item">
-                      <strong>{settlement.from}</strong>
-                      <span>owes</span>
-                      <strong>{settlement.to}</strong>
-                      <span>{formatMoney(settlement.amount, "INR")}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="helper">Everyone is settled up right now.</p>
-              )}
-            </div>
-            <div className="stack-list">
-              {activeTrip.expenses.map((expense, index) => (
-                <div key={expense.id} className="list-card split-expense-card">
-                  <div className="list-card-head">
-                    <span className="sequence-badge">{String(index + 1).padStart(2, "0")}</span>
-                  </div>
-                  <input
-                    value={expense.title}
-                    onChange={(e) =>
-                      void updateTrip((trip) => ({
-                        ...trip,
-                        expenses: trip.expenses.map((entry) =>
-                          entry.id === expense.id ? { ...entry, title: e.target.value } : entry
-                        )
-                      }))
-                    }
-                  />
-                  <div className="three-column">
-                    <input
-                      type="number"
-                      value={expense.amount}
-                      onChange={(e) =>
-                        void updateTrip((trip) => ({
-                          ...trip,
-                          expenses: trip.expenses.map((entry) =>
-                            entry.id === expense.id ? { ...entry, amount: Number(e.target.value) } : entry
-                          )
-                        }))
-                      }
-                      placeholder="Add amount"
-                    />
-                    <select
-                      value={expense.paidBy}
-                      onChange={(e) =>
-                        void updateTrip((trip) => ({
-                          ...trip,
-                          expenses: trip.expenses.map((entry) =>
-                            entry.id === expense.id ? { ...entry, paidBy: e.target.value } : entry
-                          )
-                        }))
-                      }
-                    >
-                      {memberNames.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="split-member-count">
-                      {expense.splitBetween.length || memberNames.length} members
-                    </div>
-                  </div>
-                  <div className="three-column">
-                    <select
-                      value={expense.category || defaultExpenseCategory}
-                      onChange={(e) =>
-                        void updateTrip((trip) => ({
-                          ...trip,
-                          expenses: trip.expenses.map((entry) =>
-                            entry.id === expense.id ? { ...entry, category: e.target.value } : entry
-                          )
-                        }))
-                      }
-                    >
-                      {expenseCategories.map((category) => (
-                        <option key={category.label} value={category.label}>
-                          {category.icon} {category.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="date"
-                      value={expense.date || ""}
-                      onChange={(e) =>
-                        void updateTrip((trip) => ({
-                          ...trip,
-                          expenses: trip.expenses.map((entry) =>
-                            entry.id === expense.id ? { ...entry, date: e.target.value } : entry
-                          )
-                        }))
-                      }
-                    />
-                    <div className="split-member-count">
-                      {formatMoney(
-                        expense.amount / Math.max(expense.splitBetween.length || memberNames.length, 1),
-                        "INR"
-                      )}{" "}
-                      each
-                    </div>
-                  </div>
-                  <div className="member-chip-row">
-                    {memberNames.map((name) => {
-                      const isSelected =
-                        expense.splitBetween.length === 0
-                          ? memberNames.includes(name)
-                          : expense.splitBetween.includes(name);
 
-                      return (
-                        <button
-                          key={name}
-                          type="button"
-                          className={`member-chip ${isSelected ? "selected" : ""}`}
-                          onClick={() =>
+            <div className="split-summary-grid">
+              <article className="card metric-panel">
+                <h3>{formatMoney(spentTotal, "INR")}</h3>
+                <p>Total spent</p>
+              </article>
+              <article className="card metric-panel">
+                <h3>{formatMoney(perTraveler, "INR")}</h3>
+                <p>Per person</p>
+              </article>
+              <article className="card metric-panel">
+                <h3 className={balanceCards.some((entry) => entry.amount > 0) ? "positive-text" : ""}>
+                  {formatMoney(
+                    balanceCards.find((entry) => entry.name === memberNames[0])?.amount || 0,
+                    "INR"
+                  )}
+                </h3>
+                <p>You're owed</p>
+              </article>
+            </div>
+
+            <div className="stack-list">
+              {splitView === "balances"
+                ? balanceCards.map((entry) => (
+                    <div key={entry.name} className={`split-balance-card ${entry.amount >= 0 ? "positive" : "negative"}`}>
+                      <span>{entry.name}</span>
+                      <strong>{formatMoney(Math.abs(entry.amount), "INR")}</strong>
+                      <small>{entry.amount >= 0 ? "owed" : "owes"}</small>
+                    </div>
+                  ))
+                : null}
+
+              {splitView === "settle" ? (
+                settlements.length ? (
+                  <div className="settlement-card">
+                    {settlements.map((settlement, index) => (
+                      <div key={`${settlement.from}-${settlement.to}-${index}`} className="settlement-item">
+                        <strong>{settlement.from}</strong>
+                        <span>pays</span>
+                        <strong>{settlement.to}</strong>
+                        <span>{formatMoney(settlement.amount, "INR")}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="helper">Everyone is settled up right now.</p>
+                )
+              ) : null}
+
+              {splitView === "activity"
+                ? recentExpenses.length
+                  ? recentExpenses.map((expense) => (
+                      <div key={expense.id} className="recent-expense-row card">
+                        <span>{expense.date || "--"}</span>
+                        <strong>{expense.title || "Untitled expense"}</strong>
+                        <span>{expense.paidBy || "Unassigned"}</span>
+                        <strong>{formatMoney(expense.amount, "INR")}</strong>
+                      </div>
+                    ))
+                  : <p className="helper">No activity yet.</p>
+                : null}
+
+              {splitView === "expenses"
+                ? activeTrip.expenses.map((expense, index) => (
+                    <div key={expense.id} className="list-card split-expense-card">
+                      <div className="list-card-head">
+                        <span className="sequence-badge">{String(index + 1).padStart(2, "0")}</span>
+                      </div>
+                      <input
+                        value={expense.title}
+                        placeholder="Expense description"
+                        onChange={(e) =>
+                          void updateTrip((trip) => ({
+                            ...trip,
+                            expenses: trip.expenses.map((entry) =>
+                              entry.id === expense.id ? { ...entry, title: e.target.value } : entry
+                            )
+                          }))
+                        }
+                      />
+                      <div className="three-column">
+                        <input
+                          type="number"
+                          value={expense.amount}
+                          onChange={(e) =>
                             void updateTrip((trip) => ({
                               ...trip,
-                              expenses: trip.expenses.map((entry) => {
-                                if (entry.id !== expense.id) {
-                                  return entry;
-                                }
-
-                                const currentParticipants = entry.splitBetween.length
-                                  ? entry.splitBetween
-                                  : memberNames;
-                                const nextParticipants = currentParticipants.includes(name)
-                                  ? currentParticipants.filter((memberName) => memberName !== name)
-                                  : [...currentParticipants, name];
-
-                                return {
-                                  ...entry,
-                                  splitBetween: nextParticipants.length ? nextParticipants : [name]
-                                };
-                              })
+                              expenses: trip.expenses.map((entry) =>
+                                entry.id === expense.id ? { ...entry, amount: Number(e.target.value) } : entry
+                              )
+                            }))
+                          }
+                          placeholder="Add amount"
+                        />
+                        <select
+                          value={expense.category || defaultExpenseCategory}
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              expenses: trip.expenses.map((entry) =>
+                                entry.id === expense.id ? { ...entry, category: e.target.value } : entry
+                              )
                             }))
                           }
                         >
-                          {name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              {!activeTrip.expenses.length ? <p className="helper">Add shared expenses for this group.</p> : null}
+                          {expenseCategories.map((category) => (
+                            <option key={category.label} value={category.label}>
+                              {category.icon} {category.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="date"
+                          value={expense.date || ""}
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              expenses: trip.expenses.map((entry) =>
+                                entry.id === expense.id ? { ...entry, date: e.target.value } : entry
+                              )
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="three-column">
+                        <select
+                          value={expense.paidBy}
+                          onChange={(e) =>
+                            void updateTrip((trip) => ({
+                              ...trip,
+                              expenses: trip.expenses.map((entry) =>
+                                entry.id === expense.id ? { ...entry, paidBy: e.target.value } : entry
+                              )
+                            }))
+                          }
+                        >
+                          {memberNames.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="split-member-count">
+                          {expense.splitBetween.length || memberNames.length} members
+                        </div>
+                        <div className="split-member-count">
+                          {formatMoney(
+                            expense.amount / Math.max(expense.splitBetween.length || memberNames.length, 1),
+                            "INR"
+                          )}{" "}
+                          each
+                        </div>
+                      </div>
+                      <div className="member-chip-row">
+                        {memberNames.map((name) => {
+                          const isSelected =
+                            expense.splitBetween.length === 0
+                              ? memberNames.includes(name)
+                              : expense.splitBetween.includes(name);
+
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              className={`member-chip ${isSelected ? "selected" : ""}`}
+                              onClick={() =>
+                                void updateTrip((trip) => ({
+                                  ...trip,
+                                  expenses: trip.expenses.map((entry) => {
+                                    if (entry.id !== expense.id) {
+                                      return entry;
+                                    }
+
+                                    const currentParticipants = entry.splitBetween.length
+                                      ? entry.splitBetween
+                                      : memberNames;
+                                    const nextParticipants = currentParticipants.includes(name)
+                                      ? currentParticipants.filter((memberName) => memberName !== name)
+                                      : [...currentParticipants, name];
+
+                                    return {
+                                      ...entry,
+                                      splitBetween: nextParticipants.length ? nextParticipants : [name]
+                                    };
+                                  })
+                                }))
+                              }
+                            >
+                              {name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                : null}
+
+              {splitView === "expenses" && !activeTrip.expenses.length ? <p className="helper">Add your first expense above.</p> : null}
             </div>
           </article>
-
-          <div className="split-side">
-            <article className="card metric-panel">
-              <p className="eyebrow">Per traveler</p>
-              <h3>{formatMoney(perTraveler, "INR")}</h3>
-              <p className="muted">A quick equal-share estimate across all current trip members.</p>
-            </article>
-            <InviteCard inviteCode={activeTrip.inviteCode} tripTitle={activeTrip.title} />
-          </div>
         </section>
       ) : null}
 
       {activeTab === "packing" ? (
-        <section className="overview-grid">
-          <article className="card">
+        <section className="card">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Packing</p>
+              <h3>Checklist</h3>
+            </div>
+          </div>
+          <article className="packing-card">
             <div className="section-head">
               <div>
                 <p className="eyebrow">Packing and prep</p>
-                <h3>Checklist</h3>
+                <h3>Essentials</h3>
               </div>
               <button
                 className="ghost-button compact-button"
@@ -1259,14 +1503,23 @@ export function TripPlanner({ session, offlineOnly, preferredEntryMode = "choose
               ))}
             </div>
           </article>
+        </section>
+      ) : null}
 
-          <article className="card">
-            <p className="eyebrow">Travel notes</p>
-            <h3>Keep everything handy</h3>
+      {activeTab === "notes" ? (
+        <section className="card notes-layout">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">A quick summary of your journey</p>
+              <h3>Trip Notes</h3>
+            </div>
+          </div>
+          <article className="card notes-editor-card">
             <textarea
+              className="notes-editor"
               value={activeTrip.notes}
               onChange={(e) => void updateTrip((trip) => ({ ...trip, notes: e.target.value }))}
-              placeholder="Add notes"
+              placeholder="Add some notes about your trip - highlights, goals, packing reminders..."
             />
           </article>
         </section>
